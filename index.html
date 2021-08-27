@@ -62,10 +62,12 @@
 </head>
 <body>
   <script id="status-template" type="text/template">
-    <a href="#">Cancel (X)</a>
     <span>sessionId: {sessionId}</span>
-    <span>rank: {rank}</span>
-    <span>status: <label class="status"></label></span>
+    <span>longitude: {longitude}</span>
+    <span>latitude: {latitude}</span>
+    <span>userType: {userType}</span>
+    <span>name: {name}</span>
+    <span>Matched Users: <label class="status"></label></span>
   </script>
 
   <div class="new-player">
@@ -80,8 +82,15 @@
         <li>(You may customize how the rank-based client distribution works, see the source-code of "RankedLobbyRoom.ts")</li>
       </ul>
 
-      <label for="rank">Rank:</label> <input type="number" id="rank" placeholder="rank" />
       <label for="numClientsToMatch">Match size:</label> <input type="number" id="numClientsToMatch" placeholder="numClientsToMatch" value="4" />
+      <label for="longitude">Longitude:</label> <input type="number" id="longitude" placeholder="longitude" value="45.0" step="0.0001" min="-180" max="180"/>
+      <label for="latitude">Latitude:</label> <input type="number" id="latitude" placeholder="latitude" value="45.0" step="0.0001" min="-90" max="90"/>
+      <label for="name">Name:</label> <input type="text" id="name" placeholder="name"/>
+      <label for="user">User Type:</label>
+      <select name="user" id="user">
+        <option value="patient">Patient</option>
+        <option value="caregiver">Caregiver</option>
+      </select>
       <input type="submit" value="create" />
     </form>
   </div>
@@ -95,50 +104,28 @@
     const client = new Colyseus.Client();
 
     async function createNewPlayer() {
-      const rank = parseInt(document.querySelector("#rank").value);
       const numClientsToMatch = parseInt(document.querySelector("#numClientsToMatch").value);
-
-      const connection = await client.joinOrCreate("ranked", { rank, numClientsToMatch });
+      const longitude = parseFloat(document.querySelector("#longitude").value);
+      const latitude = parseFloat(document.querySelector("#latitude").value);
+      const userType = document.querySelector("#user").value;
+      const name = document.querySelector("#name").value;
+      const connection = await client.joinOrCreate("ranked", { numClientsToMatch, longitude, latitude, userType, name });
 
       const status = document.createElement("div");
       status.innerHTML = document.getElementById("status-template")
         .innerHTML
         .replace("{sessionId}", connection.sessionId)
-        .replace("{rank}", rank);
-
-      const cancelButton = status.querySelector('a');
-      cancelButton.addEventListener("click", (e) => {
-        e.preventDefault();
-
-        if (cancelButton.classList.contains('cancelled')) {
-          return;
-        }
-
-        cancelButton.classList.add('cancelled')
-        cancelButton.innerText = 'CANCELLED';
-
-        connection.leave();
-      });
+        .replace("{longitude}", longitude)
+        .replace("{latitude}", latitude)
+        .replace("{userType}", userType)
+        .replace("{name}", name);
 
       container.appendChild(status);
 
       connection.onLeave(() => console.log("MATCHMAKE CONNECTION DROPPED."));
-
-      connection.onMessage("seat", (message) => {
-        client.consumeSeatReservation(message).then((room) => {
-          connection.send("confirm");
-
-          room.onMessage("color", (color) => {
-            status.style.backgroundColor = color;
-          });
-
-          status.removeChild(cancelButton);
-          status.querySelector('.status').innerHTML = "CONNECTED!";
-        });
-      });
-
+      
       connection.onMessage("clients", (message) => {
-        status.querySelector('.status').innerHTML = message + "/" + numClientsToMatch;
+        status.querySelector('.status').innerHTML = message;
       });
 
       // re-set values for new connection
@@ -146,10 +133,11 @@
     }
 
     function populateRandomValues() {
-      document.querySelector("#rank").value = Math.floor(Math.random() * 100);
+      document.querySelector("#longitude").value = ((Math.random() * 360) - 180).toFixed(4);
+      document.querySelector("#latitude").value = ((Math.random() * 180) - 90).toFixed(4);
     }
-
     populateRandomValues();
+
   </script>
 
 </body>
