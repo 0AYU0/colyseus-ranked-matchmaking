@@ -1,16 +1,5 @@
 import { Room, Client, Delayed, matchMaker } from "colyseus";
 
-interface MatchmakingGroup {
-  averageLongitude: number;
-  clients: ClientStat[],
-  priority?: boolean;
-
-  ready?: boolean;
-  confirmed?: number;
-
-  // cancelConfirmationTimeout?: Delayed;
-}
-
 interface PlayerLocation {
   longitude: number;
   latitude: number;
@@ -43,10 +32,6 @@ export class RankedLobbyRoom extends Room {
    */
   evaluateGroupsInterval = 2000;
 
-  /**
-   * Groups of players per iteration
-   */
-   groups: MatchmakingGroup[] = [];
    /**
    * name of the room to create
    */
@@ -113,13 +98,7 @@ export class RankedLobbyRoom extends Room {
     });
     client.send("clients", 1);
   }
-
-  createGroup() {
-    let group: MatchmakingGroup = { clients: [], averageLongitude: 0 };
-    this.groups.push(group);
-    return group;
-  }
-
+  
   redistributeGroups() {
     // re-set all groups
     const stats = this.stats.sort((a, b) => a.location.longitude - b.location.longitude);
