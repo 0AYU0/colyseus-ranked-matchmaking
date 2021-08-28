@@ -7,16 +7,20 @@ interface PlayerLocation {
 
 interface ClientStat {
   client: Client;
-  waitingTime: number;
   options?: any;
-  location: PlayerLocation;
-  availability: string[];
-  assignedPatients: number;
   userType: string;
-  bestFit: ClientStat[];
   name: string;
+  location: PlayerLocation;
 }
 
+interface Patient extends ClientStat {
+  availability: {start: Date; end: Date;};
+  bestFit: Caregiver[];
+}
+
+interface Caregiver extends ClientStat {
+  availability: {start: Date; end: Date;}[];
+}
 
 export class RankedLobbyRoom extends Room {
   /**
@@ -32,9 +36,9 @@ export class RankedLobbyRoom extends Room {
    */
   evaluateGroupsInterval = 2000;
 
-   /**
-   * name of the room to create
-   */
+  /**
+  * name of the room to create
+  */
   roomToCreate = "game";
 
   /**
@@ -63,7 +67,8 @@ export class RankedLobbyRoom extends Room {
   /**
    * rank and group cache per-player
    */
-  stats: ClientStat[] = [];
+  patientStats: Patient[] = [];
+  caregiverStats: Caregiver[] = [];
 
   onCreate(options: any) {
     if (options.maxWaitingTime) {
@@ -75,7 +80,7 @@ export class RankedLobbyRoom extends Room {
     }
 
     this.onMessage("confirm", (client: Client, message: any) => {
-      const stat = this.stats.find(stat => stat.client === client);
+      const stat = this.patientStats.find(stat => stat.client === client);
     })
 
     /**
@@ -85,32 +90,34 @@ export class RankedLobbyRoom extends Room {
   }
 
   onJoin(client: Client, options: any) {
-    console.log(options);
-    this.stats.push({
-      client: client,
-      waitingTime: 0,
-      location: {longitude: options.longitude, latitude: options.latitude},
-      availability: options.availability,
-      assignedPatients: options.assignedPatients,
-      userType: options.userType,
-      bestFit: [],
-      name: options.name,
-    });
-    client.send("clients", 1);
+    if (options.userType === 'patient') {
+      this.patientStats.push({
+        client: client,
+        userType: options.userType,
+        name: options.name,
+        location: { longitude: options.longitude, latitude: options.latitude },
+        availability: { start: options.patientStartDateTime, end: options.patientEndDateTime },
+        bestFit: [],
+      });
+    } else {
+      console.log(options);
+      this.caregiverStats.push({
+        client: client,
+        userType: options.userType,
+        name: options.name,
+        location: { longitude: options.longitude, latitude: options.latitude },
+        availability: options.nextAvailableDays,
+      });
+    }
+    console.log(this.patientStats);
   }
-  
-  redistributeGroups() {
-    // re-set all groups
-    const stats = this.stats.sort((a, b) => a.location.longitude - b.location.longitude);
-    const patients = this.stats.filter(user => user.userType === 'patient');
-    const caregivers = this.stats.filter(user => user.userType === 'caregiver');
 
-    patients.forEach((patient) => {
-      caregivers.forEach((caregiver) => {
+  redistributeGroups() {
+    this.patientStats.forEach((patient) => {
+      this.caregiverStats.forEach((caregiver) => {
         const rank = this.genRankUsers(patient, caregiver);
-        if(rank > 25){
-          if(!patient.bestFit.some(elem => elem === caregiver)){
-            caregiver.bestFit.push(patient);
+        if (rank > 25) {
+          if (!patient.bestFit.some(elem => elem === caregiver)) {
             patient.bestFit.push(caregiver);
           }
         }
@@ -119,20 +126,19 @@ export class RankedLobbyRoom extends Room {
     this.checkGroupsReady();
   }
 
-  genRankUsers(patient: ClientStat, caregiver: ClientStat){
+  genRankUsers(patient: ClientStat, caregiver: ClientStat) {
     return 50;
   }
 
   checkGroupsReady() {
-      this.stats.forEach(user => {
-        user.client.send("clients", user.bestFit.map(element => element.name).join(", "));
-      });
-    
+    this.patientStats.forEach(user => {
+      user.client.send("clients", user.bestFit.map(element => element.name).join(", "));
+    });
   }
 
   onLeave(client: Client, consented: boolean) {
-    const index = this.stats.findIndex(stat => stat.client === client);
-    this.stats.splice(index, 1);
+    const index = this.patientStats.findIndex(stat => stat.client === client);
+    this.patientStats.splice(index, 1);
   }
 
   onDispose() {
