@@ -132,9 +132,6 @@
         const pDate = document.querySelector("#patient-date").value;
         const pStartTime = document.querySelector("#patient-time-start").value;
         const pEndTime = document.querySelector("#patient-time-end").value;
-        console.log(pDate);
-        console.log(pStartTime);
-        console.log(pEndTime);
         connection = await client.joinOrCreate("ranked", {
           numClientsToMatch,
           longitude,
@@ -150,9 +147,10 @@
         const caregiverEndTime = document.querySelector("#caregiver-time-end").value;
         const currentDate = new Date();
         const nextAvailableDays = caregiverAvailableWeekdays.map((weekday) => {
+          const newDateOffset = new Date(currentDate).getDate() + ((7 - new Date(currentDate).getDay() + weekday) % 7);
           return {
-            start: new Date(currentDate.toDateString() + " " + caregiverStartTime).setDate(new Date(currentDate).getDate() + ((7 - new Date(currentDate).getDay() + weekday) % 7)),
-            end: new Date(currentDate.toDateString() + " " + caregiverEndTime).setDate(new Date(currentDate).getDate() + ((7 - new Date(currentDate).getDay() + weekday) % 7)),
+            start: new Date(currentDate.toDateString() + " " + caregiverStartTime).setDate(newDateOffset),
+            end: new Date(currentDate.toDateString() + " " + caregiverEndTime).setDate(newDateOffset),
           }
         });
         connection = await client.joinOrCreate("ranked", { numClientsToMatch, longitude, latitude, userType, name, nextAvailableDays });
